@@ -1,7 +1,6 @@
 from pydantic import BaseModel, ValidationError
 import json
 import argparse
-from llm_sdk import llm_sdk
 
 class Prompt(BaseModel):
     prompt: str
@@ -57,11 +56,3 @@ def config_files() -> dict:
         "output": args.output
     }
 
-def main() -> None:
-    files = config_files()
-    functions = load_functions(files["functions"])
-    prompts = load_prompts(files["prompts"])
-    llm = llm_sdk.Small_LLM_Model()
-    llm.get_path_to_vocab_file()
-
-main()
