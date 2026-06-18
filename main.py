@@ -9,6 +9,13 @@ def get_valid_tokens_ids(id_to_token, allowed_chars):
             result.append(token_id)
     return result
 
+def get_tokens_without_chars(id_to_token, forbidden_chars):
+    result = []
+    for token_id, token in id_to_token.items():
+        if token and all(not c in forbidden_chars for c in token):
+            result.append(token_id)
+    return result
+
 def pick_best_valid_token(logits, valid_ids):
     max_logit = float('-inf')
     best_id = None
@@ -19,6 +26,35 @@ def pick_best_valid_token(logits, valid_ids):
             best_id = token_id
     return best_id
 
+def generate_value(llm, id_to_token, vocab, ids_list, param_type):
+    char = ""
+    if param_type == "number":
+        has_dot = False
+        has_digit = False
+        while not (has_digit and ("," in char or "}" in char)):
+            allowed = "0123456789}," if has_dot else "0123456789},."
+            if not has_digit:
+                allowed = "0123456789-"
+            logits = llm.get_logits_from_input_ids(ids_list)
+            valid_ids = get_valid_tokens_ids(id_to_token, allowed)
+            best_id = pick_best_valid_token(logits, valid_ids)
+            char = id_to_token[best_id]
+            if char == ".":
+                has_dot = True
+            if char.isdigit():
+                 has_digit = True
+            if char not in (",", "}"):
+                ids_list.append(best_id)
+    elif param_type == "string":
+        while char != '"':
+            logits = llm.get_logits_from_input_ids(ids_list)
+            valid_ids = get_tokens_without_chars(id_to_token, '"')
+            valid_ids.append(vocab['"'])
+            best_id = pick_best_valid_token(logits, valid_ids)
+            char = id_to_token[best_id]
+            ids_list.append(best_id)
+    return ids_list
+
 def main() -> None:
     files = config_files()
     functions = load_functions(files["functions"])
@@ -28,45 +64,13 @@ def main() -> None:
 
     with open(voc) as f:
         vocab = json.load(f)
-    """ for token, token_id in list(vocab.items())[:30]:
-        print(token, "->", token_id)
- """
     id_to_token = {v: k for k, v in vocab.items()}
-    text = "The capital of France is"
-    """
-     input_ids = llm.encode(text) #list[list]
-    ids_list = input_ids[0].tolist() #list[list] -> list
-    print(ids_list)
-    logits = llm.get_logits_from_input_ids(ids_list)
-    print(len(logits))
-    best_id = logits.index(max(logits))
-    print(best_id, id_to_token.get(best_id))
     
-    input_ids = llm.encode(text)
-    ids_list = input_ids[0].tolist()
-
-    for _ in range(20):
-        logits = llm.get_logits_from_input_ids(ids_list)
-        best_id = logits.index(max(logits))
-        ids_list.append(best_id)
-        print(llm.decode(ids_list))
-    valid_ids = get_valid_tokens_ids(id_to_token, "0123456789")
-    print(len(valid_ids))
-    for tid in valid_ids[:20]:
-        print(tid, repr(id_to_token[tid]))
-    print(vocab.get("42"))
-    print(vocab.get("123"))
-
-    for tid, tok in id_to_token.items():
-        if tok == "":
-            print(tid)"""
-    text = '{"a": '
+    text = '{"name": "fn_greet", "parameters": {"name": "'    
     ids_list = llm.encode(text)[0].tolist()
-    for _ in range(10):
-        logits = llm.get_logits_from_input_ids(ids_list)
-        valid_ids = get_valid_tokens_ids(id_to_token, "0123456789")
-        best_id = pick_best_valid_token(logits, valid_ids)
-        ids_list.append(best_id)
-        print(llm.decode(ids_list))
-        #print(best_id, repr(id_to_token[best_id]))
+    print(llm.decode(generate_value(llm, id_to_token, vocab, ids_list, "string")))
+    text = '{"name": "fn_add", "parameters": {"a": '
+    ids_list = llm.encode(text)[0].tolist()
+    print(llm.decode(generate_value(llm, id_to_token, vocab, ids_list, "number")))
+
 main()
