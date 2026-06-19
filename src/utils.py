@@ -1,0 +1,105 @@
+def tokens_with_allowed_chars(id_to_token, allowed_chars) -> list:
+    result = []
+    for token_id, token in id_to_token.items():
+        if token and all(c in allowed_chars for c in token):
+            result.append(token_id)
+    return result
+
+
+def tokens_without_forbidden_chars(id_to_token, forbidden_chars) -> list:
+    result = []
+    for token_id, token in id_to_token.items():
+        if token and not all(c in forbidden_chars for c in token):
+            result.append(token_id)
+    return result
+
+
+def valid_tokens_sequence(id_to_token: dict, expected_txt: str) -> list[int]:
+    valid_ids = []
+    for token_id, token_text in id_to_token.items():
+        if not token_text:
+            continue
+        if expected_txt.startswith(token_text):
+            valid_ids.append(token_id)
+    return valid_ids
+
+
+def generer_sequence_exacte(llm, id_to_token, ids_list: list[int],
+                            forced_sequence: str) -> list[int]:
+    """
+    Force le modèle à générer 'forced_sequence' token par token.
+    Met à jour et retourne 'ids_list'.
+    """
+    remain = forced_sequence
+
+    while len(remain) > 0:
+        logits = llm.get_logits_from_input_ids(ids_list)
+
+        valid_ids = valid_tokens_sequence(id_to_token, remain)
+
+        if not valid_ids:
+            print(
+                f"Alert : cannot find token for '{remain}'")
+            break
+
+        best_id = pick_best_valid_token(logits, valid_ids)
+        token_choisi_texte = id_to_token[best_id]
+
+        ids_list.append(best_id)
+        remain = remain[len(token_choisi_texte):]
+
+    return ids_list
+
+
+def pick_best_valid_token(logits, valid_ids) -> int:
+    max_logit = float('-inf')
+    best_id = None
+    for token_id in valid_ids:
+        logit = logits[token_id]
+        if logit > max_logit:
+            max_logit = logit
+            best_id = token_id
+    return best_id
+
+
+def generate_value(llm, id_to_token, vocab, ids_list, param_type) -> list:
+    char = ""
+    if param_type == "number":
+        has_dot = False
+        has_digit = False
+        while not (has_digit and ("," in char or "}" in char)):
+            allowed = "0123456789}," if has_dot else "0123456789},."
+            if not has_digit:
+                allowed = "0123456789-"
+            logits = llm.get_logits_from_input_ids(ids_list)
+            valid_ids = tokens_with_allowed_chars(id_to_token, allowed)
+            best_id = pick_best_valid_token(logits, valid_ids)
+            char = id_to_token[best_id]
+            if char == ".":
+                has_dot = True
+            if char.isdigit():
+                has_digit = True
+            # if char not in (",", "}"):
+            ids_list.append(best_id)
+    elif param_type == "string":
+        while '"' not in char:
+            logits = llm.get_logits_from_input_ids(ids_list)
+            # valid_ids = tokens_without_forbidden_chars(id_to_token, '"')
+            # valid_ids.append(vocab['"'])
+            best_id = pick_best_valid_token(logits, list(id_to_token.keys()))
+            char = id_to_token[best_id]
+            ids_list.append(best_id)
+    return ids_list
+
+
+def get_function_name(generated_text: str) -> str:
+    """ Implementation for extracting function name from generated text """
+    m = '"name": "'
+    if m not in generated_text:
+        return None
+    parts = generated_text.split(m)
+    next_part = parts[1]
+    if '"' in next_part:
+        fn = next_part.split('"')[0]
+        return fn
+    return None
