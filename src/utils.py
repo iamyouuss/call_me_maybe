@@ -24,29 +24,24 @@ def valid_tokens_sequence(id_to_token: dict, expected_txt: str) -> list[int]:
     return valid_ids
 
 
-def generer_sequence_exacte(llm, id_to_token, ids_list: list[int],
-                            forced_sequence: str) -> list[int]:
-    """
-    Force le modèle à générer 'forced_sequence' token par token.
-    Met à jour et retourne 'ids_list'.
-    """
-    remain = forced_sequence
+def genererate_sequence(llm, id_to_token, ids_list: list[int],
+                        sequence: str) -> list[int]:
 
-    while len(remain) > 0:
+    while len(sequence) > 0:
         logits = llm.get_logits_from_input_ids(ids_list)
 
-        valid_ids = valid_tokens_sequence(id_to_token, remain)
+        valid_ids = valid_tokens_sequence(id_to_token, sequence)
 
-        if not valid_ids:
+        """ if not valid_ids:
             print(
-                f"Alert : cannot find token for '{remain}'")
-            break
+                f"Alert : cannot find token for '{sequence}'")
+            break """
 
         best_id = pick_best_valid_token(logits, valid_ids)
-        token_choisi_texte = id_to_token[best_id]
+        token_txt = id_to_token[best_id]
 
         ids_list.append(best_id)
-        remain = remain[len(token_choisi_texte):]
+        sequence = sequence[len(token_txt):]
 
     return ids_list
 
