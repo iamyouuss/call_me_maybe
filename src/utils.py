@@ -14,47 +14,13 @@ def tokens_without_forbidden_chars(id_to_token, forbidden_chars) -> list:
     return result
 
 
-def valid_tokens_sequence(id_to_token: dict, expected_txt: str) -> list[int]:
-    valid_ids = []
-    for token_id, token_text in id_to_token.items():
-        if not token_text:
-            continue
-        if expected_txt.startswith(token_text):
-            valid_ids.append(token_id)
-    return valid_ids
 
 
-def genererate_sequence(llm, id_to_token, ids_list: list[int],
-                        sequence: str) -> list[int]:
-
-    while len(sequence) > 0:
-        logits = llm.get_logits_from_input_ids(ids_list)
-
-        valid_ids = valid_tokens_sequence(id_to_token, sequence)
-
-        """ if not valid_ids:
-            print(
-                f"Alert : cannot find token for '{sequence}'")
-            break """
-
-        best_id = pick_best_valid_token(logits, valid_ids)
-        token_txt = id_to_token[best_id]
-
-        ids_list.append(best_id)
-        sequence = sequence[len(token_txt):]
-
-    return ids_list
 
 
-def pick_best_valid_token(logits, valid_ids) -> int:
-    max_logit = float('-inf')
-    best_id = None
-    for token_id in valid_ids:
-        logit = logits[token_id]
-        if logit > max_logit:
-            max_logit = logit
-            best_id = token_id
-    return best_id
+
+
+
 
 
 def generate_value(llm, id_to_token, vocab, ids_list, param_type) -> list:

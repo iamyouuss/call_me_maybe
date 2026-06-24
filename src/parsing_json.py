@@ -50,7 +50,7 @@ def load_prompts(path) -> list[Prompt]:
     return prompts
 
 
-def config_files() -> dict:
+def config() -> dict:
     parser = argparse.ArgumentParser()
     parser.add_argument("--functions_definition", type=str,
                         default="data/input/functions_definition.json")
@@ -60,7 +60,7 @@ def config_files() -> dict:
                         default="data/output/function_calls.json")
     args = parser.parse_args()
     return {
-        "functions": args.functions_definition,
-        "prompts": args.input,
+        "functions": load_functions(args.functions_definition),
+        "prompts": load_prompts(args.input),
         "output": args.output
     }
