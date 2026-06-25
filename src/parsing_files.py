@@ -18,7 +18,7 @@ class FunctionModel(BaseModel):
     returns: ParameterModel
 
 
-def load_functions(path) -> list[FunctionModel]:
+def load_functions(path: str) -> list[FunctionModel]:
     json_data = None
     try:
         with open(path) as f:
@@ -34,7 +34,7 @@ def load_functions(path) -> list[FunctionModel]:
     return functions
 
 
-def load_prompts(path) -> list[Prompt]:
+def load_prompts(path: str) -> list[Prompt]:
     json_data = None
     try:
         with open(path) as f:

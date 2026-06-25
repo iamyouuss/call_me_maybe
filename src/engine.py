@@ -22,7 +22,8 @@ class Engine():
             self.token_to_id = json.load(f)
         self.id_to_token = {v: k for k, v in self.token_to_id.items()}
 
-    def pick_best_token(self, logits, valid_ids) -> int:
+    def pick_best_token(self, logits: list[float], valid_ids: list[int]
+                        ) -> int:
         max_logit = float('-inf')
         best_id = None
         for token_id in valid_ids:
@@ -30,6 +31,8 @@ class Engine():
             if logit > max_logit:
                 max_logit = logit
                 best_id = token_id
+        if best_id is None:
+            raise ValueError(f"Alert: cannot find token for logits: {logits}")
         return best_id
 
     def encode_sequence(self, sequence: str) -> None:
@@ -69,15 +72,15 @@ class Engine():
                 self.current_function = f
         return generated
 
-    def tokens_with_allowed_chars(self, allowed_chars) -> list:
+    def tokens_with_allowed_chars(self, allowed_chars: str) -> list[int]:
         result = []
         for token_id, token in self.id_to_token.items():
             if token and all(c in allowed_chars for c in token):
                 result.append(token_id)
         return result
 
-    def tokens_without_forbidden_chars(self, forbidden_chars
-                                       ) -> list:
+    def tokens_without_forbidden_chars(self, forbidden_chars: str
+                                       ) -> list[int]:
         result = []
         for token_id, token in self.id_to_token.items():
             if token and all(c not in forbidden_chars for c in token):
