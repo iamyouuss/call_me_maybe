@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Any
 from llm_sdk.llm_sdk import Small_LLM_Model
 from src import FunctionModel
@@ -10,9 +11,10 @@ class Engine():
         self.functions: list[FunctionModel] = config['functions']
         self.function_names: list[str] = [f.name for f in self.functions]
         self.current_function: FunctionModel | None = None
+        self.current_ids_list: list[int] = []
         self.prompts: list[str] = config['prompts']
         self.output_file: str = config['output']
-        self.result: list[dict[str, Any]] = []
+        self.final_result: list[dict[str, Any]] = []
         self.id_to_token: dict[int, str] = {}
 
         voc = self.llm.get_path_to_vocab_file()
@@ -30,36 +32,19 @@ class Engine():
                 best_id = token_id
         return best_id
 
-    def generate_sequence(self, ids_list: list[int], sequence: str
-                          ) -> list[int]:
-        while len(sequence) > 0:
-            valid_ids = []
-            logits = self.llm.get_logits_from_input_ids(ids_list)
-            for id, token in self.id_to_token.items():
-                if not token:
-                    continue
-                if sequence.startswith(token):
-                    valid_ids.append(id)
-            if not valid_ids:
-                raise ValueError(
-                    f"Alert : cannot find token for '{sequence}'")
+    def encode_sequence(self, sequence: str) -> None:
+        ids = self.llm.encode(sequence)[0].tolist()
+        self.current_ids_list.extend(ids)
 
-            best_id = self.pick_best_token(logits, valid_ids)
-            token_txt = self.id_to_token[best_id]
-
-            ids_list.append(best_id)
-            sequence = sequence[len(token_txt):]
-        return ids_list
-
-    def pick_function_model(self, prompt: str, ids_list: list[int]
-                            ) -> list[int]:
+    def pick_function_model(self, prompt: str,) -> str:
         f_prompt = "Available functions:\n"
         for f in self.functions:
             f_prompt += f"- {f.name}: {f.description}\n"
         f_prompt += f'User request: {prompt}\n{{"name": "'
         prompt_ids_list = self.llm.encode(f_prompt)[0].tolist()
+        self.current_ids_list = prompt_ids_list.copy()
         generated = ""
-        while generated not in self.functions_name:
+        while generated not in self.function_names:
             valid_ids = []
             logits = self.llm.get_logits_from_input_ids(prompt_ids_list)
             for id, token in self.id_to_token.items():
@@ -77,43 +62,103 @@ class Engine():
             best_id = self.pick_best_token(logits, valid_ids)
             generated += self.id_to_token[best_id]
             prompt_ids_list.append(best_id)
-            ids_list.append(best_id)
+            self.current_ids_list.append(best_id)
 
         for f in self.functions:
             if f.name == generated:
                 self.current_function = f
-        return ids_list
+        return generated
 
-    def generate_parameters(self, ids_list: list[int],
-                            function_model: FunctionModel) -> list[int]:
-        ids_list = self.generate_sequence(ids_list, '", "parameters": {')
-        parameters = function_model.parameters
+    def tokens_with_allowed_chars(self, allowed_chars) -> list:
+        result = []
+        for token_id, token in self.id_to_token.items():
+            if token and all(c in allowed_chars for c in token):
+                result.append(token_id)
+        return result
 
-        for i, (p_name, p_detals) in enumerate(parameters.items()):
+    def tokens_without_forbidden_chars(self, forbidden_chars
+                                       ) -> list:
+        result = []
+        for token_id, token in self.id_to_token.items():
+            if token and all(c not in forbidden_chars for c in token):
+                result.append(token_id)
+        return result
+
+    def generate_number(self) -> int | float:
+        result = ""
+        while True:
+            allowed = "0123456789-.,} Ġ\n"
+            valid_ids = self.tokens_with_allowed_chars(allowed)
+            logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
+
+            best_id = self.pick_best_token(logits, valid_ids)
+            char = self.id_to_token[best_id]
+            if any(stop_char in char
+                   for stop_char in [',', '}', ' ', 'Ġ', '\n']):
+                break
+            self.current_ids_list.append(best_id)
+            result += char
+        try:
+            return float(result) if '.' in result else int(result)
+        except ValueError:
+            return 0
+
+    def generate_string(self) -> str:
+        result = ""
+        while True:
+            valid_ids = list(self.id_to_token.keys())
+            logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
+            best_id = self.pick_best_token(logits, valid_ids)
+            char = self.id_to_token[best_id]
+
+            if '"' in char:
+                result += char.split('"')[0]
+                break
+
+            self.current_ids_list.append(best_id)
+            result += char
+
+        return result.replace("Ġ", " ").replace("Ċ", "\n")
+
+    def generate_parameters(self) -> list[int]:
+        self.encode_sequence('", "parameters": {')
+        parameters = self.current_function.parameters
+        result = {}
+        for i, (p_name, p_details) in enumerate(parameters.items()):
             if i > 0:
-                ids_list = self.generate_sequence(ids_list, ', ')
-            ids_list = self.generate_sequence(ids_list, f'"{p_name}": ')
-            p_type = p_detals.type
-
+                self.encode_sequence(', ')
+            self.encode_sequence(f'"{p_name}": ')
+            p_type = p_details.type
             if p_type == "string":
-                ids_list = self.generate_string(ids_list)
+                self.encode_sequence('"')
+                result[p_name] = self.generate_string()
+                self.encode_sequence('"')
             elif p_type in ["number", "integer"]:
-                ids_list = self.generate_number(ids_list)
-            elif p_type == "boolean":
-                ids_list = self.generate_boolean(ids_list)
-        ids_list = self.generate_sequence(ids_list, '}')
-        return ids_list
+                result[p_name] = self.generate_number()
+        self.encode_sequence('}')
+        return result
 
-    def get_started(self,) -> None:
-        for p in self.prompts:
-            result = f'{{"prompt": {p},\n'
-            ids_list = self.llm.encode(result)
-            ids_list = self.pick_function_model(p, ids_list)
-            ids_list = self.generate_sequence(ids_list, '"name": "')
-            ids_list = self.generate_sequence(ids_list,
-                                              f'"{self.current_function.name}"'
-                                              )
-            ids_list = self.generate_parameters(ids_list,
-                                                self.current_function)
-            ids_list = self.generate_sequence(ids_list, '}')
-            print(self.llm.decode(ids_list))
+    def write_to_output_file(self) -> None:
+        os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
+        with open(self.output_file, "w") as f:
+            json.dump(self.final_result, f, indent="\t")
+
+    def get_started(self) -> None:
+        try:
+            print(f"\n\033[1;35mStarting Generation for Call_Me_Maybe project "
+                  f"({len(self.prompts)} prompts given)\033[0m\n")
+            for i, prompt in enumerate(self.prompts, 1):
+                self.current_ids_list = []
+                result = {
+                    "prompt": prompt.prompt,
+                    "name": self.pick_function_model(prompt.prompt),
+                    "parameters": self.generate_parameters()
+                }
+                self.final_result.append(result)
+                output = json.dumps(result, indent=2)
+                print(f"\033[1;36mPrompt number {i}:\033[0m\n{output}\n")
+            self.write_to_output_file()
+            print("\033[1;35mGeneration completed successfully!\033[0m")
+            print(f"Json output stored in '\033[1;32m{self.output_file}'")
+        except Exception as e:
+            print(f"Alert: an error occurred while generating output: {e}")

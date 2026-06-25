@@ -1,5 +1,6 @@
 MAIN= main.py
-
+SRC= engine.py /
+		parsing_json.py
 
 install:
 	pip install -r requirements.txt

@@ -7,4 +7,5 @@ def main() -> None:
     engine.get_started()
 
 
-main()
+if __name__ == "__main__":
+    main()
