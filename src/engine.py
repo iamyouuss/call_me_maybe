@@ -2,7 +2,7 @@ import json
 import os
 from typing import Any
 from llm_sdk.llm_sdk import Small_LLM_Model
-from src import FunctionModel
+from .parsing_files import FunctionModel, PromptModel
 
 
 class Engine():
@@ -12,7 +12,7 @@ class Engine():
         self.function_names: list[str] = [f.name for f in self.functions]
         self.current_function: FunctionModel | None = None
         self.current_ids_list: list[int] = []
-        self.prompts: list[str] = config['prompts']
+        self.prompts: list[PromptModel] = config['prompts']
         self.output_file: str = config['output']
         self.final_result: list[dict[str, Any]] = []
         self.id_to_token: dict[int, str] = {}
@@ -32,12 +32,15 @@ class Engine():
                 max_logit = logit
                 best_id = token_id
         if best_id is None:
-            raise ValueError(f"Alert: cannot find token for logits: {logits}")
+            raise ValueError("[Error] cannot find token for logits")
         return best_id
 
     def encode_sequence(self, sequence: str) -> None:
-        ids = self.llm.encode(sequence)[0].tolist()
-        self.current_ids_list.extend(ids)
+        try:
+            ids = self.llm.encode(sequence)[0].tolist()
+            self.current_ids_list.extend(ids)
+        except ValueError as e:
+            print(f"[Error] failed to encode sequence '{sequence}': {e}")
 
     def pick_function_model(self, prompt: str,) -> str:
         f_prompt = "Available functions:\n"
@@ -52,15 +55,15 @@ class Engine():
             logits = self.llm.get_logits_from_input_ids(prompt_ids_list)
             for id, token in self.id_to_token.items():
                 test = generated + token
-                for f in self.function_names:
+                for f_name in self.function_names:
                     if not token:
                         continue
-                    if f.startswith(test):
+                    if f_name.startswith(test):
                         valid_ids.append(id)
                         break
             if not valid_ids:
                 raise ValueError(
-                    f"Alert: cannot find token for '{generated}'")
+                    f"[Error] cannot find token for '{generated}'")
 
             best_id = self.pick_best_token(logits, valid_ids)
             generated += self.id_to_token[best_id]
@@ -70,6 +73,9 @@ class Engine():
         for f in self.functions:
             if f.name == generated:
                 self.current_function = f
+        if self.current_function is None:
+            raise RuntimeError("[Error] No function found "
+                               f"for the following prompt '{prompt}'")
         return generated
 
     def tokens_with_allowed_chars(self, allowed_chars: str) -> list[int]:
@@ -87,7 +93,7 @@ class Engine():
                 result.append(token_id)
         return result
 
-    def generate_number(self) -> int | float:
+    def generate_number(self) -> float:
         result = ""
         while True:
             allowed = "0123456789-.,} Ġ\n"
@@ -102,9 +108,9 @@ class Engine():
             self.current_ids_list.append(best_id)
             result += char
         try:
-            return float(result) if '.' in result else int(result)
+            return float(result)
         except ValueError:
-            return 0
+            return 0.0
 
     def generate_string(self) -> str:
         result = ""
@@ -123,10 +129,12 @@ class Engine():
 
         return result.replace("Ġ", " ").replace("Ċ", "\n")
 
-    def generate_parameters(self) -> list[int]:
+    def generate_parameters(self) -> dict[str, Any]:
         self.encode_sequence('", "parameters": {')
+        if self.current_function is None:
+            raise RuntimeError("[Error] current_function is not set.")
         parameters = self.current_function.parameters
-        result = {}
+        result: dict[str, Any] = {}
         for i, (p_name, p_details) in enumerate(parameters.items()):
             if i > 0:
                 self.encode_sequence(', ')
@@ -159,9 +167,9 @@ class Engine():
                 }
                 self.final_result.append(result)
                 output = json.dumps(result, indent=2)
-                print(f"\033[1;36mPrompt number {i}:\033[0m\n{output}\n")
+                print(f"\033[1;36mOutput number {i}:\033[0m\n{output}\n")
             self.write_to_output_file()
             print("\033[1;35mGeneration completed successfully!\033[0m")
             print(f"Json output stored in '\033[1;32m{self.output_file}'")
         except Exception as e:
-            print(f"Alert: an error occurred while generating output: {e}")
+            print(f"[Error] an error occurred while generating output: {e}")

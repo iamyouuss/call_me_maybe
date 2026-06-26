@@ -1,23 +1,32 @@
-MAIN= main.py
-SRC= engine.py /
-		parsing_json.py
-
 install:
-	pip install -r requirements.txt
+	clear
+	@echo "Creating virtual environment and installing dependancies"
+	uv venv
+	uv pip install -e .
+	clear
+	@echo "Everything setup, ready to launch"
 
 run:
-	python3 main.py
+	uv run python -m src
 
 debug:
-	python3 -m pdb main.py
+	uv run python3 -m pdb main.py
 
 clean:
-	rm -rf __pycache__/*
+	clear
+	rm -rf .venv
+	rm -rf output
+	rm -rf .mypy_cache
+	find . -type d -name "__pycache__" -exec rm -r {} +
+	clear
+	@echo "✨ Virtual environment and caches deleted ✨"
 
 lint:
-	flake8 .
-	mypy src/ --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --follow-imports=silent
+	clear
+	uv run flake8 src/
+	uv run mypy src/ --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --follow-imports=silent
 
 lint-strict:
-	flake8 .
-	mypy . 
+	clear
+	uv run flake8 src/
+	uv run mypy src/ --strict --warn-return-any --warn-unused-ignores --ignore-missing-imports --disallow-untyped-defs --check-untyped-defs --follow-imports=silent

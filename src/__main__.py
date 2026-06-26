@@ -1,4 +1,5 @@
-from src import config, Engine
+from .parsing_files import config
+from .engine import Engine
 
 
 def main() -> None:

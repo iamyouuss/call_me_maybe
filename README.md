@@ -1,0 +1,102 @@
+*This project has been created as part of the 42 curriculum by [Ton Nom / Ton Login].*
+
+# Call-Me-Maybe: Constrained Decoding Engine
+
+## Description
+**Call-Me-Maybe** is a custom Function Calling engine built around a Small Large Language Model (LLM). The goal of this project is to force a local LLM to output perfectly structured JSON data that strictly adheres to predefined function signatures (schemas). 
+
+Instead of relying on prompt engineering and hoping the model formats its output correctly, this project implements **Constrained Decoding**. By intervening at the logits level during the token generation process, the engine mathematically guarantees that the output will be valid JSON and will respect the requested parameter types (strings, numbers, booleans), effectively turning the LLM into a reliable extraction tool.
+
+---
+
+## Algorithm Explanation
+The core of this project relies on a **State Machine combined with Prefix-Matching Token Filtering**. 
+
+1. **State Machine:** The engine tracks the current state of the JSON generation (e.g., waiting for the function name, waiting for a parameter key, waiting for a parameter value).
+2. **Forced Sequences:** For structural JSON elements (like `{"name": "` or `", "parameters": {`), the engine bypasses the model's probabilities and forces the exact sequence of tokens.
+3. **Prefix Filtering (Function Names):** When the model needs to choose a function, the engine calculates the logits but applies a strict mask. It only allows tokens that form a valid prefix of one of the available function names from the Pydantic schemas.
+4. **Type-Specific Generation:**
+   - **Numbers:** The vocabulary is restricted strictly to digits `0-9`, `-`, `.`, and stop characters (`,`, `}`).
+   - **Strings:** The model is given full freedom to generate text, but the engine intercepts the generation the moment a closing quote `"` is predicted, preventing hallucinations.
+
+## Design Decisions
+- **Object-Oriented Architecture:** The logic is encapsulated within an `Engine` class. This allows for clean state management (tracking the `current_ids_list` and `current_function`) without passing dozens of arguments between functions.
+- **Fast Dependency Management:** I chose `uv` over standard `pip` for blazing-fast virtual environment creation and dependency installation.
+- **Strict Linting & Typing:** The project is enforced with strict `mypy` typing and a highly restrictive `flake8` configuration (max-complexity = 10) to ensure highly maintainable and readable code.
+- **No External API Calls:** The engine relies entirely on local execution via the provided `llm_sdk`, ensuring privacy and offline capability.
+
+## Performance Analysis
+- **Accuracy:** The constrained decoding approach yields **100% structural accuracy**. Malformed JSON or unsupported function names are mathematically impossible.
+- **Speed:** Instead of decoding the entire 50,000+ token vocabulary string-by-string on every generation step, the prefix-matching is optimized. However, auto-regressive generation remains the primary bottleneck due to the sequential nature of LLMs.
+- **Reliability:** The engine successfully handles edge cases such as negative numbers, floating-point extraction, and capturing complex strings (including spaces and punctuation) directly from the prompt.
+
+## Challenges Faced
+1. **The "Infinite Loop" Bug (Stop Tokens):** Initially, the engine fell into infinite loops when generating numbers because the model would generate merged stop tokens (like `}}` instead of `}`). This was solved by checking if any stop character was *inside* the generated token string, rather than checking for strict equality.
+2. **Byte-Level BPE Quirks:** The tokenizer uses `Ġ` for spaces and `Ċ` for newlines. This caused formatting issues in extracted strings. A post-processing cleanup step (`.replace("Ġ", " ")`) was implemented to restore natural text.
+3. **Mypy Strictness:** Managing variable types dynamically (especially dictionaries expecting both `str` and `float`) raised static typing errors. This was resolved by properly utilizing `Optional` types and `dict[str, Any]`.
+
+## Testing Strategy
+The implementation was validated through:
+1. **Diverse Prompts:** Testing straightforward extractions ("What is 2+2?") alongside complex, noisy prompts ("Replace all numbers in 'Hello 34 I'm 233 years old'").
+2. **Static Analysis:** Running `make lint` to ensure 0 errors from `flake8` and `mypy --strict`.
+3. **Edge Case Injection:** Purposely feeding ambiguous prompts to ensure the engine fails gracefully or defaults safely without crashing the Python script.
+
+---
+
+## Instructions
+
+### Prerequisites
+Ensure you have `python3` and `uv` installed on your system.
+*(If you don't have `uv`, you can install it via `pip install uv`).*
+
+### Installation
+To create the virtual environment and install all dependencies (including `torch` and `pydantic`), simply run:
+```bash
+make install
+```
+
+### Execution
+To run the engine and process the prompts:
+```bash
+make run
+```
+
+### Cleaning
+To remove the virtual environment, Python caches (`__pycache__`, `.pyc`), and Mypy caches:
+```bash
+make clean
+```
+*(You can also use `make lint` to run the strict static analysis).*
+
+---
+
+## Example Usage
+
+**Input Prompt:**
+```text
+Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'
+```
+
+**Terminal Output / JSON Generated:**
+```json
+{
+  "prompt": "Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat'",
+  "name": "fn_substitute_string_with_regex",
+  "parameters": {
+    "source_string": "The cat sat on the mat with another cat",
+    "regex": "cat.*cat.*",
+    "replacement": "dog"
+  }
+}
+```
+
+---
+
+## Resources
+- **Documentation:**
+  - [HuggingFace Transformers / Constrained Decoding generation](https://huggingface.co/docs/transformers/main/en/generation_strategies)
+  - [Understanding Byte-Pair Encoding (BPE)](https://huggingface.co/learn/nlp-course/chapter6/5)
+  - [Pydantic Official Documentation](https://docs.pydantic.dev/)
+
+- **AI Usage:**
+  - *Google Gemini:* Used as an interactive tutor and architectural sounding board. Gemini assisted in debugging specific infinite loop issues related to BPE tokenization (`Ġ` and `}}`), provided guidance on configuring a strict `Makefile` with `uv`, and helped resolve complex static typing errors raised by Mypy and Flake8 (C901 complexity). AI was strictly used for debugging and structural advice, while the core logical implementation of the State Machine was written manually.

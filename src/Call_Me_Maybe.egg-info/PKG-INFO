@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: Call_Me_Maybe
+Version: 1.0.0
+Summary: Function calling with LLM
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic
+Requires-Dist: numpy
+Requires-Dist: torch
+Requires-Dist: transformers

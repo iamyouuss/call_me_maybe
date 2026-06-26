@@ -1,9 +1,11 @@
+from typing import Any
+
 from pydantic import BaseModel, ValidationError
 import json
 import argparse
 
 
-class Prompt(BaseModel):
+class PromptModel(BaseModel):
     prompt: str
 
 
@@ -34,7 +36,7 @@ def load_functions(path: str) -> list[FunctionModel]:
     return functions
 
 
-def load_prompts(path: str) -> list[Prompt]:
+def load_prompts(path: str) -> list[PromptModel]:
     json_data = None
     try:
         with open(path) as f:
@@ -44,20 +46,20 @@ def load_prompts(path: str) -> list[Prompt]:
     prompts = []
     if json_data is not None:
         try:
-            prompts = [Prompt(**prompt_data) for prompt_data in json_data]
+            prompts = [PromptModel(**prompt_data) for prompt_data in json_data]
         except ValidationError as e:
             print(f"Error parsing prompts from '{path}':\n{e}\n")
     return prompts
 
 
-def config() -> dict:
+def config() -> dict[str, Any]:
     parser = argparse.ArgumentParser()
     parser.add_argument("--functions_definition", type=str,
                         default="data/input/functions_definition.json")
     parser.add_argument("--input", type=str,
                         default="data/input/function_calling_tests.json")
     parser.add_argument("--output", type=str,
-                        default="data/output/function_calls.json")
+                        default="data/output/function_calling_results.json")
     args = parser.parse_args()
     return {
         "functions": load_functions(args.functions_definition),
