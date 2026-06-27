@@ -7,6 +7,7 @@ install:
 	@echo "Everything setup, ready to launch"
 
 run:
+	clear
 	uv run python -m src
 
 debug:

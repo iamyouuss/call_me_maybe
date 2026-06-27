@@ -26,13 +26,15 @@ def load_functions(path: str) -> list[FunctionModel]:
         with open(path) as f:
             json_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"File '{path}' not found or invalid JSON:\n{e}\n")
+        print(f"\033[0;31m[Error]\033[0m File '{path}' not found or invalid "
+              f"JSON: {e}")
     functions = []
     if json_data is not None:
         try:
             functions = [FunctionModel(**func_data) for func_data in json_data]
         except ValidationError as e:
-            print(f"Error parsing functions from '{path}':\n{e}\n")
+            print(f"\033[0;31m[Error]\033[0m Parsing functions from '{path}' "
+                  f"went wrong: {e}")
     return functions
 
 
@@ -42,27 +44,36 @@ def load_prompts(path: str) -> list[PromptModel]:
         with open(path) as f:
             json_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"File '{path}' not found or invalid JSON:\n{e}\n")
+        print(f"\033[0;31m[Error]\033[0mFile '{path}' "
+              f"not found or invalid JSON: {e}")
     prompts = []
     if json_data is not None:
         try:
             prompts = [PromptModel(**prompt_data) for prompt_data in json_data]
         except ValidationError as e:
-            print(f"Error parsing prompts from '{path}':\n{e}\n")
+            print(f"\033[0;31m[Error]\033[0m Parsing prompts from '{path}' "
+                  f"went wrong: {e}")
     return prompts
 
 
 def config() -> dict[str, Any]:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--functions_definition", type=str,
-                        default="data/input/functions_definition.json")
-    parser.add_argument("--input", type=str,
-                        default="data/input/function_calling_tests.json")
-    parser.add_argument("--output", type=str,
-                        default="data/output/function_calling_results.json")
-    args = parser.parse_args()
-    return {
-        "functions": load_functions(args.functions_definition),
-        "prompts": load_prompts(args.input),
-        "output": args.output
-    }
+    try:
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--functions_definition", type=str,
+                            default="data/input/functions_definition.json")
+        parser.add_argument("--input", type=str,
+                            default="data/input/function_calling_tests.json")
+        parser.add_argument("--output", type=str,
+                            default="data/output/function_calling_results.json"
+                            )
+        parser.add_argument("--model", type=str, default="Qwen/Qwen3-0.6B")
+        args = parser.parse_args()
+        return {
+            "functions": load_functions(args.functions_definition),
+            "prompts": load_prompts(args.input),
+            "output": args.output,
+            "model": args.model
+        }
+    except Exception as e:
+        print("\033[0;31m[Error]\033[0m Something went wrong "
+              f"while parsing files: {e}")

@@ -7,7 +7,7 @@ from .parsing_files import FunctionModel, PromptModel
 
 class Engine():
     def __init__(self, config: dict[str, Any]) -> None:
-        self.llm = Small_LLM_Model()
+        self.llm = Small_LLM_Model(model_name=config['model'])
         self.functions: list[FunctionModel] = config['functions']
         self.function_names: list[str] = [f.name for f in self.functions]
         self.current_function: FunctionModel | None = None
@@ -32,7 +32,8 @@ class Engine():
                 max_logit = logit
                 best_id = token_id
         if best_id is None:
-            raise ValueError("[Error] cannot find token for logits")
+            raise ValueError("\033[0;31m[Error]\033[0m "
+                             "Cannot find token for logits")
         return best_id
 
     def encode_sequence(self, sequence: str) -> None:
@@ -40,7 +41,19 @@ class Engine():
             ids = self.llm.encode(sequence)[0].tolist()
             self.current_ids_list.extend(ids)
         except ValueError as e:
-            print(f"[Error] failed to encode sequence '{sequence}': {e}")
+            print("\033[0;31m[Error]\033[0m failed to encode sequence "
+                  f"'{sequence}': {e}")
+
+    def decode_sequence(self, sequence: str) -> None:
+        return sequence.replace("Ġ", " ").replace("Ċ", "\n")
+
+    def assign_current_function(self, name: str, prompt: str) -> None:
+        for f in self.functions:
+            if f.name == name:
+                self.current_function = f
+        if self.current_function is None:
+            raise RuntimeError("\033[0;31m[Error]\033[0m No function found "
+                               f"for the following prompt '{prompt}'")
 
     def pick_function_model(self, prompt: str,) -> str:
         f_prompt = "Available functions:\n"
@@ -63,19 +76,19 @@ class Engine():
                         break
             if not valid_ids:
                 raise ValueError(
-                    f"[Error] cannot find token for '{generated}'")
+                    "\033[0;31m[Error]\033[0m cannot find token for "
+                    f"'{generated}'")
 
             best_id = self.pick_best_token(logits, valid_ids)
+            token_str = self.id_to_token[best_id]
+            print(f"\033[33m{self.decode_sequence(token_str)}\033[0m",
+                  end="", flush=True)
             generated += self.id_to_token[best_id]
             prompt_ids_list.append(best_id)
             self.current_ids_list.append(best_id)
+        print()
 
-        for f in self.functions:
-            if f.name == generated:
-                self.current_function = f
-        if self.current_function is None:
-            raise RuntimeError("[Error] No function found "
-                               f"for the following prompt '{prompt}'")
+        self.assign_current_function(generated, prompt)
         return generated
 
     def tokens_with_allowed_chars(self, allowed_chars: str) -> list[int]:
@@ -102,6 +115,7 @@ class Engine():
 
             best_id = self.pick_best_token(logits, valid_ids)
             char = self.id_to_token[best_id]
+            print(f"\033[33m{char}\033[0m", end="", flush=True)
             if any(stop_char in char
                    for stop_char in [',', '}', ' ', 'Ġ', '\n']):
                 break
@@ -120,6 +134,9 @@ class Engine():
             best_id = self.pick_best_token(logits, valid_ids)
             char = self.id_to_token[best_id]
 
+            print(f"\033[33m{self.decode_sequence(char)}\033[0m",
+                  end="", flush=True)
+
             if '"' in char:
                 result += char.split('"')[0]
                 break
@@ -127,12 +144,13 @@ class Engine():
             self.current_ids_list.append(best_id)
             result += char
 
-        return result.replace("Ġ", " ").replace("Ċ", "\n")
+        return self.decode_sequence(result)
 
     def generate_parameters(self) -> dict[str, Any]:
         self.encode_sequence('", "parameters": {')
         if self.current_function is None:
-            raise RuntimeError("[Error] current_function is not set.")
+            raise RuntimeError(
+                "\033[0;31m[Error]\033[0m current_function is not set.")
         parameters = self.current_function.parameters
         result: dict[str, Any] = {}
         for i, (p_name, p_details) in enumerate(parameters.items()):
@@ -146,6 +164,7 @@ class Engine():
                 self.encode_sequence('"')
             elif p_type in ["number", "integer"]:
                 result[p_name] = self.generate_number()
+                print()
         self.encode_sequence('}')
         return result
 
@@ -160,16 +179,20 @@ class Engine():
                   f"({len(self.prompts)} prompts given)\033[0m\n")
             for i, prompt in enumerate(self.prompts, 1):
                 self.current_ids_list = []
-                result = {
-                    "prompt": prompt.prompt,
-                    "name": self.pick_function_model(prompt.prompt),
-                    "parameters": self.generate_parameters()
-                }
-                self.final_result.append(result)
-                output = json.dumps(result, indent=2)
-                print(f"\033[1;36mOutput number {i}:\033[0m\n{output}\n")
+                try:
+                    result = {
+                        "prompt": prompt.prompt,
+                        "name": self.pick_function_model(prompt.prompt),
+                        "parameters": self.generate_parameters()
+                    }
+                    self.final_result.append(result)
+                    output = json.dumps(result, indent=2)
+                    print(f"\033[1;36mOutput number {i}:\033[0m\n{output}\n")
+                except Exception as e:
+                    print(f"[Skipped] Unrecoverable error on prompt {i}: {e}")
+                    continue
             self.write_to_output_file()
             print("\033[1;35mGeneration completed successfully!\033[0m")
             print(f"Json output stored in '\033[1;32m{self.output_file}'")
         except Exception as e:
-            print(f"[Error] an error occurred while generating output: {e}")
+            print(f"\033[0;31m[Error]\033[0m Couldn't generate output: {e}")

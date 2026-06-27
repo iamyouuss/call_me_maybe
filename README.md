@@ -1,4 +1,4 @@
-*This project has been created as part of the 42 curriculum by [Ton Nom / Ton Login].*
+*This project has been created as part of the 42 curriculum by yghergho.*
 
 # Call-Me-Maybe: Constrained Decoding Engine
 
@@ -17,12 +17,12 @@ The core of this project relies on a **State Machine combined with Prefix-Matchi
 3. **Prefix Filtering (Function Names):** When the model needs to choose a function, the engine calculates the logits but applies a strict mask. It only allows tokens that form a valid prefix of one of the available function names from the Pydantic schemas.
 4. **Type-Specific Generation:**
    - **Numbers:** The vocabulary is restricted strictly to digits `0-9`, `-`, `.`, and stop characters (`,`, `}`).
-   - **Strings:** The model is given full freedom to generate text, but the engine intercepts the generation the moment a closing quote `"` is predicted, preventing hallucinations.
+   - **Strings:** The model is given full freedom to generate text, but the engine intercepts the generation the moment a closing quote `"` is predicted.
 
 ## Design Decisions
-- **Object-Oriented Architecture:** The logic is encapsulated within an `Engine` class. This allows for clean state management (tracking the `current_ids_list` and `current_function`) without passing dozens of arguments between functions.
-- **Fast Dependency Management:** I chose `uv` over standard `pip` for blazing-fast virtual environment creation and dependency installation.
-- **Strict Linting & Typing:** The project is enforced with strict `mypy` typing and a highly restrictive `flake8` configuration (max-complexity = 10) to ensure highly maintainable and readable code.
+- **Object-Oriented Architecture:** The logic is encapsulated within an `Engine` class. This allows clean state management (tracking the `current_ids_list` and `current_function`) without passing dozens of arguments between functions.
+- **Fast Dependency Management:** The project uses `uv` for blazing-fast virtual environment creation and dependency installation.
+- **Strict Linting & Typing:** The project is enforced with strict `mypy` typing and `flake8` to ensure highly maintainable and readable code.
 - **No External API Calls:** The engine relies entirely on local execution via the provided `llm_sdk`, ensuring privacy and offline capability.
 
 ## Performance Analysis
@@ -38,7 +38,7 @@ The core of this project relies on a **State Machine combined with Prefix-Matchi
 ## Testing Strategy
 The implementation was validated through:
 1. **Diverse Prompts:** Testing straightforward extractions ("What is 2+2?") alongside complex, noisy prompts ("Replace all numbers in 'Hello 34 I'm 233 years old'").
-2. **Static Analysis:** Running `make lint` to ensure 0 errors from `flake8` and `mypy --strict`.
+2. **Static Analysis:** Running `make lint` to ensure 0 errors from `flake8` and `mypy`.
 3. **Edge Case Injection:** Purposely feeding ambiguous prompts to ensure the engine fails gracefully or defaults safely without crashing the Python script.
 
 ---
@@ -62,11 +62,11 @@ make run
 ```
 
 ### Cleaning
-To remove the virtual environment, Python caches (`__pycache__`, `.pyc`), and Mypy caches:
+To remove the virtual environment, Python caches (`__pycache__`, `.mypy_cache`), and Mypy caches:
 ```bash
 make clean
 ```
-*(You can also use `make lint` to run the strict static analysis).*
+*(You can also use `make lint` or `make lint-strict` to run static analysis).*
 
 ---
 
@@ -99,4 +99,4 @@ Substitute the word 'cat' with 'dog' in 'The cat sat on the mat with another cat
   - [Pydantic Official Documentation](https://docs.pydantic.dev/)
 
 - **AI Usage:**
-  - *Google Gemini:* Used as an interactive tutor and architectural sounding board. Gemini assisted in debugging specific infinite loop issues related to BPE tokenization (`Ġ` and `}}`), provided guidance on configuring a strict `Makefile` with `uv`, and helped resolve complex static typing errors raised by Mypy and Flake8 (C901 complexity). AI was strictly used for debugging and structural advice, while the core logical implementation of the State Machine was written manually.
+  - Used as an interactive tutor and architectural sounding board. AI assisted in debugging specific infinite loop issues related to BPE tokenization (`Ġ` and `}}`), provided guidance on configuring a strict `Makefile` with `uv`, and helped resolve complex static typing errors raised by Mypy and Flake8.
