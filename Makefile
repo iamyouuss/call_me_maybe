@@ -8,7 +8,7 @@ install:
 
 run:
 	clear
-	uv run python -m src
+	uv run python -m src $(ARGS)
 
 debug:
 	uv run python3 -m pdb main.py
@@ -16,7 +16,7 @@ debug:
 clean:
 	clear
 	rm -rf .venv
-	rm -rf output
+	rm -rf data/output
 	rm -rf .mypy_cache
 	find . -type d -name "__pycache__" -exec rm -r {} +
 	clear

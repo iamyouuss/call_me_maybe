@@ -56,10 +56,18 @@ make install
 ```
 
 ### Execution
-To run the engine and process the prompts:
+To run the engine and process the prompts withe default confirguration:
 ```bash
 make run
 ```
+
+### Advanced execution (passing arguments):
+If you want to use a different model or test a different input file, you must pass the arguments via ARGS  variable in Make
+```bash
+make run ARGS=" --model Qwen/Qwen-1.5B" 
+```
+
+(Alternatively, you can bypass Make and run the command directly: `uv run python3 main.py --model Qwen/Qwen/1.5B`)
 
 ### Cleaning
 To remove the virtual environment, Python caches (`__pycache__`, `.mypy_cache`), and Mypy caches:
