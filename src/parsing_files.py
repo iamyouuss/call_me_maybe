@@ -1,3 +1,4 @@
+import sys
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
@@ -77,3 +78,4 @@ def config() -> dict[str, Any]:
     except Exception as e:
         print("\033[0;31m[Error]\033[0m Something went wrong "
               f"while parsing files: {e}")
+        sys.exit(1)

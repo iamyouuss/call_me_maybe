@@ -44,8 +44,10 @@ class Engine():
             print("\033[0;31m[Error]\033[0m failed to encode sequence "
                   f"'{sequence}': {e}")
 
-    def decode_sequence(self, sequence: str) -> None:
-        return sequence.replace("Ġ", " ").replace("Ċ", "\n")
+    def decode_token(self, token_id: int) -> str:
+        """Décode un ID en texte propre en gérant les caractères BPE."""
+        token_str = self.id_to_token[token_id]
+        return token_str.replace("Ġ", " ").replace("Ċ", "\n")
 
     def assign_current_function(self, name: str, prompt: str) -> None:
         for f in self.functions:
@@ -80,10 +82,9 @@ class Engine():
                     f"'{generated}'")
 
             best_id = self.pick_best_token(logits, valid_ids)
-            token_str = self.id_to_token[best_id]
-            print(f"\033[33m{self.decode_sequence(token_str)}\033[0m",
-                  end="", flush=True)
-            generated += self.id_to_token[best_id]
+            token_str = self.decode_token(best_id)
+            print(f"\033[33m{token_str}\033[0m", end="", flush=True)
+            generated += token_str
             prompt_ids_list.append(best_id)
             self.current_ids_list.append(best_id)
         print()
@@ -114,7 +115,7 @@ class Engine():
             logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
 
             best_id = self.pick_best_token(logits, valid_ids)
-            char = self.id_to_token[best_id]
+            char = self.decode_token(best_id)
             print(f"\033[33m{char}\033[0m", end="", flush=True)
             if any(stop_char in char
                    for stop_char in [',', '}', ' ', 'Ġ', '\n']):
@@ -129,22 +130,22 @@ class Engine():
     def generate_string(self) -> str:
         result = ""
         while True:
-            valid_ids = list(self.id_to_token.keys())
             logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
-            best_id = self.pick_best_token(logits, valid_ids)
-            char = self.id_to_token[best_id]
-
-            print(f"\033[33m{self.decode_sequence(char)}\033[0m",
-                  end="", flush=True)
+            best_id = self.pick_best_token(logits,
+                                           list(self.id_to_token.keys()))
+            char = self.decode_token(best_id)
 
             if '"' in char:
                 result += char.split('"')[0]
                 break
 
+            print(f"\033[33m{char}\033[0m",
+                  end="", flush=True)
+
             self.current_ids_list.append(best_id)
             result += char
 
-        return self.decode_sequence(result)
+        return result
 
     def generate_parameters(self) -> dict[str, Any]:
         self.encode_sequence('", "parameters": {')
@@ -164,7 +165,7 @@ class Engine():
                 self.encode_sequence('"')
             elif p_type in ["number", "integer"]:
                 result[p_name] = self.generate_number()
-                print()
+            print()
         self.encode_sequence('}')
         return result
 
