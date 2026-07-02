@@ -20,7 +20,7 @@ clean:
 	rm -rf .mypy_cache
 	find . -type d -name "__pycache__" -exec rm -r {} +
 	clear
-	@echo "✨ Virtual environment and caches deleted ✨"
+	@echo "Virtual environment and caches deleted"
 
 lint:
 	clear
