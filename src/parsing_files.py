@@ -22,38 +22,39 @@ class FunctionModel(BaseModel):
 
 
 def load_functions(path: str) -> list[FunctionModel]:
-    json_data = None
     try:
         with open(path) as f:
             json_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"\033[0;31m[Error]\033[0m File '{path}' not found or invalid "
               f"JSON: {e}")
-    functions = []
-    if json_data is not None:
-        try:
-            functions = [FunctionModel(**func_data) for func_data in json_data]
-        except ValidationError as e:
-            print(f"\033[0;31m[Error]\033[0m Parsing functions from '{path}' "
-                  f"went wrong: {e}")
+        sys.exit(1)
+    try:
+        functions = [FunctionModel(**func_data) for func_data in json_data]
+    except ValidationError as e:
+        print(f"\033[0;31m[Error]\033[0m Parsing functions from '{path}' "
+              f"went wrong: {e}")
+        sys.exit(1)
+    if not functions:
+        print(f"\033[0;31m[Error]\033[0m No valid functions found in '{path}'")
+        sys.exit(1)
     return functions
 
 
 def load_prompts(path: str) -> list[PromptModel]:
-    json_data = None
     try:
         with open(path) as f:
             json_data = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"\033[0;31m[Error]\033[0mFile '{path}' "
               f"not found or invalid JSON: {e}")
-    prompts = []
-    if json_data is not None:
-        try:
-            prompts = [PromptModel(**prompt_data) for prompt_data in json_data]
-        except ValidationError as e:
-            print(f"\033[0;31m[Error]\033[0m Parsing prompts from '{path}' "
-                  f"went wrong: {e}")
+        sys.exit(1)
+    try:
+        prompts = [PromptModel(**prompt_data) for prompt_data in json_data]
+    except ValidationError as e:
+        print(f"\033[0;31m[Error]\033[0m Parsing prompts from '{path}' "
+              f"went wrong: {e}")
+        sys.exit(1)
     return prompts
 
 

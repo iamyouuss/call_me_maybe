@@ -99,21 +99,27 @@ class Engine():
                 result.append(token_id)
         return result
 
-    def tokens_without_forbidden_chars(self, forbidden_chars: str
-                                       ) -> list[int]:
-        result = []
-        for token_id, token in self.id_to_token.items():
-            if token and all(c not in forbidden_chars for c in token):
-                result.append(token_id)
-        return result
+    def generate_boolean(self) -> bool:
+        result = ""
+        for _ in range(50):
+            allowed = "truefalse"
+            valid_ids = self.tokens_with_allowed_chars(allowed)
+            logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
+            best_id = self.pick_best_token(logits, valid_ids)
+            char = self.decode_token(best_id)
+            print(f"\033[33m{char}\033[0m", end="", flush=True)
+            result += char
+            self.current_ids_list.append(best_id)
+            if result in ["true", "false"]:
+                break
+        return result == "true"
 
     def generate_number(self) -> float:
         result = ""
-        while True:
-            allowed = "0123456789-.,} Ġ\n"
+        for _ in range(50):
+            allowed = "-0123456789-.,} Ġ\n"
             valid_ids = self.tokens_with_allowed_chars(allowed)
             logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
-
             best_id = self.pick_best_token(logits, valid_ids)
             char = self.decode_token(best_id)
             print(f"\033[33m{char}\033[0m", end="", flush=True)
@@ -129,22 +135,18 @@ class Engine():
 
     def generate_string(self) -> str:
         result = ""
-        while True:
+        for _ in range(50):
             logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
             best_id = self.pick_best_token(logits,
                                            list(self.id_to_token.keys()))
             char = self.decode_token(best_id)
-
             if '"' in char:
                 result += char.split('"')[0]
                 break
-
             print(f"\033[33m{char}\033[0m",
                   end="", flush=True)
-
             self.current_ids_list.append(best_id)
             result += char
-
         return result
 
     def generate_parameters(self) -> dict[str, Any]:
@@ -159,12 +161,14 @@ class Engine():
                 self.encode_sequence(', ')
             self.encode_sequence(f'"{p_name}": ')
             p_type = p_details.type
-            if p_type == "string":
+            if p_type in ["boolean", "bool"]:
+                result[p_name] = self.generate_boolean()
+            elif p_type in ["number", "integer", "float", "double"]:
+                result[p_name] = self.generate_number()
+            else:
                 self.encode_sequence('"')
                 result[p_name] = self.generate_string()
                 self.encode_sequence('"')
-            elif p_type in ["number", "integer"]:
-                result[p_name] = self.generate_number()
             print()
         self.encode_sequence('}')
         return result
