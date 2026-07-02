@@ -16,7 +16,7 @@ debug:
 clean:
 	clear
 	rm -rf .venv
-	rm -rf Call_Me_Maybe.egg-info
+	rm -rf src/Call_Me_Maybe.egg-info
 	rm -rf data/output
 	rm -rf .mypy_cache
 	find . -type d -name "__pycache__" -exec rm -r {} +
