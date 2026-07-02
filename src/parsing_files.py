@@ -7,14 +7,17 @@ import argparse
 
 
 class PromptModel(BaseModel):
+    """Model for representing a prompt."""
     prompt: str
 
 
 class ParameterModel(BaseModel):
+    """Model for representing a parameter."""
     type: str
 
 
 class FunctionModel(BaseModel):
+    """Model for representing a function."""
     name: str
     description: str
     parameters: dict[str, ParameterModel]
@@ -22,6 +25,15 @@ class FunctionModel(BaseModel):
 
 
 def load_functions(path: str) -> list[FunctionModel]:
+    """
+    Load function definitions from a JSON file.
+
+    Args:
+        path (str): The path to the JSON file containing function definitions.
+
+    Returns:
+        list[FunctionModel]: A list of loaded function models.
+    """
     try:
         with open(path) as f:
             json_data = json.load(f)
@@ -42,6 +54,15 @@ def load_functions(path: str) -> list[FunctionModel]:
 
 
 def load_prompts(path: str) -> list[PromptModel]:
+    """
+    Load prompt definitions from a JSON file.
+
+    Args:
+        path (str): The path to the JSON file containing prompt definitions.
+
+    Returns:
+        list[PromptModel]: A list of loaded prompt models.
+    """
     try:
         with open(path) as f:
             json_data = json.load(f)
@@ -59,6 +80,12 @@ def load_prompts(path: str) -> list[PromptModel]:
 
 
 def config() -> dict[str, Any]:
+    """
+    Parse command-line arguments and return the configuration.
+
+    Returns:
+        dict[str, Any]: The configuration dictionary.
+    """
     try:
         parser = argparse.ArgumentParser()
         parser.add_argument("--functions_definition", type=str,

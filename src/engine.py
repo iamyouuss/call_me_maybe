@@ -6,6 +6,7 @@ from .parsing_files import FunctionModel, PromptModel
 
 
 class Engine():
+    """Engine for handling function calling logic."""
     def __init__(self, config: dict[str, Any]) -> None:
         self.llm = Small_LLM_Model(model_name=config['model'])
         self.functions: list[FunctionModel] = config['functions']
@@ -24,6 +25,16 @@ class Engine():
 
     def pick_best_token(self, logits: list[float], valid_ids: list[int]
                         ) -> int:
+        """
+        Pick the token with the highest logit from a list of valid IDs.
+
+        Args:
+            logits (list[float]): The list of logits.
+            valid_ids (list[int]): The list of valid token IDs.
+
+        Returns:
+            int: The ID of the token with the highest logit.
+        """
         max_logit = float('-inf')
         best_id = None
         for token_id in valid_ids:
@@ -37,6 +48,12 @@ class Engine():
         return best_id
 
     def encode_sequence(self, sequence: str) -> None:
+        """
+        Encode a sequence of characters into a list of token IDs.
+
+        Args:
+            sequence (str): The sequence of characters to encode.
+        """
         try:
             ids = self.llm.encode(sequence)[0].tolist()
             self.current_ids_list.extend(ids)
@@ -45,11 +62,27 @@ class Engine():
                   f"'{sequence}': {e}")
 
     def decode_token(self, token_id: int) -> str:
-        """Décode un ID en texte propre en gérant les caractères BPE."""
+        """
+        Decode a token ID into its corresponding string.
+
+        Args:
+            token_id (int): The ID of the token.
+
+        Returns:
+            str: The decoded string.
+        """
         token_str = self.id_to_token[token_id]
         return token_str.replace("Ġ", " ").replace("Ċ", "\n")
 
     def assign_current_function(self, name: str, prompt: str) -> None:
+        """
+        Assign the current function based on its name.
+
+        Args:
+            name (str): The name of the function to assign.
+            prompt (str): The user's prompt.
+
+        """
         for f in self.functions:
             if f.name == name:
                 self.current_function = f
@@ -58,6 +91,15 @@ class Engine():
                                f"for the following prompt '{prompt}'")
 
     def pick_function_model(self, prompt: str,) -> str:
+        """
+        Pick the function model based on the user prompt.
+
+        Args:
+            prompt (str): The user's prompt.
+
+        Returns:
+            str: The name of the picked function model.
+        """
         f_prompt = "Available functions:\n"
         for f in self.functions:
             f_prompt += f"- {f.name}: {f.description}\n"
@@ -93,6 +135,16 @@ class Engine():
         return generated
 
     def tokens_with_allowed_chars(self, allowed_chars: str) -> list[int]:
+        """
+        Select all token IDs that contain only allowed characters.
+
+        Args:
+            allowed_chars (str): A string containing all allowed characters.
+
+        Returns:
+            list[int]: A list of token IDs that contain only allowed
+            characters.
+        """
         result = []
         for token_id, token in self.id_to_token.items():
             if token and all(c in allowed_chars for c in token):
@@ -100,6 +152,12 @@ class Engine():
         return result
 
     def generate_boolean(self) -> bool:
+        """
+        Generate a boolean value.
+
+        Returns:
+            bool: The generated boolean value.
+        """
         result = ""
         for _ in range(50):
             allowed = "truefalse"
@@ -115,6 +173,12 @@ class Engine():
         return result == "true"
 
     def generate_number(self) -> float:
+        """
+        Generate a number.
+
+        Returns:
+            float: The generated number.
+        """
         result = ""
         for _ in range(50):
             allowed = "-0123456789-.,} Ġ\n"
@@ -134,6 +198,12 @@ class Engine():
             return 0.0
 
     def generate_string(self) -> str:
+        """
+        Generate a string.
+
+        Returns:
+            str: The generated string.
+        """
         result = ""
         for _ in range(50):
             logits = self.llm.get_logits_from_input_ids(self.current_ids_list)
@@ -150,6 +220,12 @@ class Engine():
         return result
 
     def generate_parameters(self) -> dict[str, Any]:
+        """
+        Generate the parameters for the current function.
+
+        Returns:
+            dict[str, Any]: The generated parameters.
+        """
         self.encode_sequence('", "parameters": {')
         if self.current_function is None:
             raise RuntimeError(
@@ -174,11 +250,13 @@ class Engine():
         return result
 
     def write_to_output_file(self) -> None:
+        """Write the final result to an output file."""
         os.makedirs(os.path.dirname(self.output_file), exist_ok=True)
         with open(self.output_file, "w") as f:
             json.dump(self.final_result, f, indent="\t")
 
     def get_started(self) -> None:
+        """Start the generation process."""
         try:
             print(f"\n\033[1;35mStarting Generation for Call_Me_Maybe project "
                   f"({len(self.prompts)} prompts given)\033[0m\n")
